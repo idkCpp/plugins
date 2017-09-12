@@ -6,5 +6,6 @@
     "group" :           "Extensions",
     "author" :          "Manuel Schneider",
     "dependencies" :    [],
-    "enabledbydefault": false
+    "enabledbydefault": false,
+    "type":             "normal"
 }

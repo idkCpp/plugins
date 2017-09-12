@@ -6,5 +6,6 @@
     "group" :           "Extensions",
     "author" :          "Manuel Schneider",
     "dependencies" :    ["gksu"],
-    "enabledbydefault": true
+    "enabledbydefault": true,
+    "type":             "normal"
 }

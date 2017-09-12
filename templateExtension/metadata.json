@@ -6,5 +6,6 @@
     "group" :           "Extensions",
     "author" :          "Author missing",
     "dependencies" :    [],
-    "enabledbydefault": false
+    "enabledbydefault": false,
+    "type":             "templatetype"
 }
