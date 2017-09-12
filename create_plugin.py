@@ -4,11 +4,13 @@ import os
 import re
 import sys
 import string
+import json
 from shutil import copyfile
 
 ID_KEYWORD = "projectid"
 NAMESPACE_KEYWORD = "ProjectNamespace"
 PRETTYNAME_KEYWORD = "Template"
+METATYPE_KEYWORD = "templatetype"
 ID_PATTERN = "^([a-z0-9]+)$"
 NAMESPACE_PATTERN = "^([A-Za-z][A-Za-z0-9]+)$"
 PRETTYNAME_PATTERN = "^([A-Za-z0-9 _\\-]+)$"
@@ -84,45 +86,68 @@ for localFile in filesToPrepare:
         for line in fd:
             tmp.write(re.sub(ID_KEYWORD, id_string, 
                     re.sub(NAMESPACE_KEYWORD, namespace_string, 
-                            re.sub(PRETTYNAME_KEYWORD, prettyname_string, line))))
+                            re.sub(PRETTYNAME_KEYWORD, prettyname_string, 
+                                    re.sub(METATYPE_KEYWORD, "normal", line)))))
         tmp.close()
         os.rename(tmpfile, localFile)
 
 print("Leaving directory . . .")
 os.chdir("..")
 print("Updating CMakeLists.txt . . . ")
-existingExtensions = []
-preLines = []
-postLines = []
-preSubdir = True
-postSubdir = False
-with open("CMakeLists.txt", "r") as makelist:
-    for line in makelist:
-        match = cmake_regex.match(line)
-        if match:
-            preSubdir = False
-            existingExtensions.append(match.group(1))
+sectionHeadings = {
+        "normal":   "Extension plugins",
+        "frontend": "Frontend plugins",
+        "debug":    "Non-release plugins"
+}
+existingExtensions = {
+        "normal": [],
+        "frontend": [],
+        "debug": []
+}
+preLines = '# Do not export symbols by default\nset(CMAKE_CXX_VISIBILITY_PRESET hidden)\nset(CMAKE_VISIBILITY_INLINES_HIDDEN 1)\n\n# Set the RPATH for the library lookup\nset(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/albert")\n\n'
+debugIfClause = "# Non-release plugins\nif(${BUILD_DEBUG_EXTENSIONS})\n"
+debugEndIfClause = "endif(${BUILD_DEBUG_EXTENSIONS})\n"
+
+# Get all the plugin dirs
+pluginDirs = [name for name in os.listdir(".") if os.path.isdir(name)]
+
+plugins = {
+        "normal": [],
+        "frontend": [],
+        "else": []
+}
+headings = {
+        "normal": "# Extension Plugins\n",
+        "frontend": "# Frontend Plugins\n"
+}
+
+for pDir in pluginDirs:
+    with open(os.path.join(pDir, "metadata.json"), "r") as metadataFile:
+        metadata = json.load(metadataFile)
+        if metadata["type"] != "normal" and metadata["type"] != "frontend":
+            plugins["else"].append(pDir)
         else:
-            postSubdir = not preSubdir
-        
-        if preSubdir:
-            preLines.append(line)
-        elif postSubdir:
-            postLines.append(line)
+            plugins[metadata["type"]].append(pDir)
 
-existingExtensions.append(id_string)
-existingExtensions.sort()
+plugins["normal"].sort()
+plugins["frontend"].sort()
+plugins["else"].sort()
 
-cmakefile = open("CMakeLists.txt", "w")
-for line in preLines:
-    cmakefile.write(line) # The newline is already in the line, because it didn't get stripped
 
-for ext in existingExtensions:
-    cmakefile.write("add_subdirectory(")
-    cmakefile.write(ext)
-    cmakefile.write(")\n")
+with open("CMakeLists.txt", "w") as cmakefile:
+    cmakefile.write(preLines)
+    for section in [ "normal", "frontend" ]:
+        cmakefile.write(headings[section])
+        for plugin in plugins[section]:
+            cmakefile.write("add_subdirectory(")
+            cmakefile.write(plugin)
+            cmakefile.write(")\n")
+        cmakefile.write("\n")
+    cmakefile.write(debugIfClause)
+    for plugin in plugins["else"]:
+        cmakefile.write("    add_subdirectory(")
+        cmakefile.write(plugin)
+        cmakefile.write(")\n")
+    cmakefile.write(debugEndIfClause)
 
-for line in postLines:
-    cmakefile.write(line) # The newline is already in the line, because it didn't get stripped
 
-cmakefile.close()
