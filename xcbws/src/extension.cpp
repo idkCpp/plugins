@@ -81,7 +81,10 @@ void XcbWS::Extension::teardownSession() {
 /** ***************************************************************************/
 void XcbWS::Extension::handleQuery(Core::Query * query) const {
 
+
+
     std::vector<std::shared_ptr<XcbWindowHandle>> allWins = XcbWindowHandle::getRootChildren();
+    qWarning("Got all Wins");
     for (std::shared_ptr<XcbWindowHandle>& win : allWins)
         query->addMatch(win->produceItem(), UINT_MAX);
 

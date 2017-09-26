@@ -17,6 +17,7 @@
 #include "xcbwindowhandle.h"
 #include <xcb/xcb.h>
 #include <QtX11Extras/QX11Info>
+#include <QDebug>
 
 using ActionVector = std::vector<std::shared_ptr<Core::Action> >;
 
@@ -39,7 +40,7 @@ private:
 
 class RaiseAction : public Core::Action {
 public:
-    RaiseAction(XcbWindowHandle& win);
+    RaiseAction(XcbWindowHandle& win) : win_(win) {}
     QString text() const override { return "Raise"; }
     void activate() { win_.raise(); }
 private:
@@ -48,8 +49,9 @@ private:
 
 }
 
+#include <iostream>
 /** ***************************************************************************/
-XcbWS::XcbWindowHandle::XcbWindowHandle(xcb_window_t w, xcb_get_property_cookie_t cookie) : window_(w) {
+XcbWS::XcbWindowHandle::XcbWindowHandle(xcb_window_t w, xcb_get_property_cookie_t& cookie) : window_(w) {
     // Get the property reply from the cookie
     xcb_get_property_reply_t* prop = xcb_get_property_reply(QX11Info::connection(), cookie, NULL);
 
@@ -57,31 +59,36 @@ XcbWS::XcbWindowHandle::XcbWindowHandle(xcb_window_t w, xcb_get_property_cookie_
     if (!prop)
         throw not_applicable_t();
     int len = xcb_get_property_value_length(prop);
-    if (len == 0)
+    if (!len) {
+        free(prop);
         throw not_applicable_t();
+    }
 
     // Extract the name
     char* nameloc = (char*) xcb_get_property_value(prop);
-    name_ = (char*) malloc(len +1);
-    memcpy(name_, nameloc, len);
-    name_[len] = 0;
+    char* name = (char*) malloc(len +1);
+    memcpy(name, nameloc, len);
+    name[len] = 0;
+//    name_ = QString((const char*) name);
+    name_ = QString::fromUtf8(name);
 
+    std::cout << len << '\t' << name << std::endl
+              << '\t' << name_.toStdString() << std::endl;
+    free(name);
     free(prop);
-
 }
 
 
 
 /** ***************************************************************************/
 XcbWS::XcbWindowHandle::~XcbWindowHandle() {
-    free(name_);
 }
 
 
 
 /** ***************************************************************************/
 QString XcbWS::XcbWindowHandle::name() const {
-    return QString(name_);
+    return name_;
 }
 
 
@@ -138,7 +145,6 @@ std::vector<std::shared_ptr<XcbWS::XcbWindowHandle> > XcbWS::XcbWindowHandle::ge
         requestCookies[i] = xcb_get_property(xc, false, children[i], XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 0, 100);
     }
 
-
     std::vector<std::shared_ptr<XcbWindowHandle>> toReturn;
     for (int i = 0; i < nChildren; i++) {
         try {
@@ -148,6 +154,9 @@ std::vector<std::shared_ptr<XcbWS::XcbWindowHandle> > XcbWS::XcbWindowHandle::ge
             continue;
         }
     }
+
+    free(requestCookies);
+
     return toReturn;
 }
 

@@ -35,7 +35,7 @@ class XcbWindowHandle final
 {
 public:
 
-    XcbWindowHandle(xcb_window_t, xcb_get_property_cookie_t);
+    XcbWindowHandle(xcb_window_t, xcb_get_property_cookie_t &);
     ~XcbWindowHandle();
 
     QString name() const;
@@ -46,7 +46,7 @@ public:
 
 private:
     xcb_window_t window_;
-    char* name_;
+    QString name_;
 
 };
 }
