@@ -1,0 +1,11 @@
+{
+    "id" :              "org.albert.extension.xcbws",
+    "name" :            "XCB Window Switcher",
+    "version" :         "1.0",
+    "platform" :        "All",
+    "group" :           "Extensions",
+    "author" :          "Author missing",
+    "dependencies" :    [],
+    "enabledbydefault": false,
+    "type":             "normal"
+}
