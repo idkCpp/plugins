@@ -21,27 +21,31 @@
 #include <xcb/xproto.h>
 #include "core/extension.h"
 #include "core/queryhandler.h"
+#include "core/item.h"
+#include "core/action.h"
 
 namespace XcbWS {
 
-class not_applicable_t final : std::runtime_error {
+class not_applicable_t final : std::exception {
 public:
-    char* what() const override { return "This cookie does not result in a valid handle"; }
+    const char* what() const noexcept override { return "This cookie does not result in a valid handle"; }
 };
 
 class XcbWindowHandle final
 {
 public:
 
-    XcbWindowHandle(xcb_get_property_cookie_t);
+    XcbWindowHandle(xcb_window_t, xcb_get_property_cookie_t);
     ~XcbWindowHandle();
 
     QString name() const;
     void raise();
+    std::shared_ptr<Core::Item> produceItem();
 
-    static QList<std::unique_ptr<XcbWindowHandle>> getRootChildren();
+    static std::vector<std::shared_ptr<XcbWindowHandle> > getRootChildren();
 
 private:
+    xcb_window_t window_;
     char* name_;
 
 };

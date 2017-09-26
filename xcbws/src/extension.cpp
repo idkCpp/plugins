@@ -21,7 +21,7 @@
 #include "core/item.h"
 #include "extension.h"
 #include "core/query.h"
-
+#include "xcbwindowhandle.h"
 
 
 class XcbWS::Private
@@ -43,13 +43,6 @@ XcbWS::Extension::Extension()
     /*
      * Check the Extension and Plugin header to see the members in this scope
      */
-
-    // You can throw in the constructor if something fatal happened
-    throw std::runtime_error( "Description of error." );
-    throw std::string( "Description of error." );
-    throw QString( "Description of error." );
-    throw "Description of error.";
-    throw; // Whatever prints "unknown error"
 }
 
 
@@ -88,8 +81,12 @@ void XcbWS::Extension::teardownSession() {
 /** ***************************************************************************/
 void XcbWS::Extension::handleQuery(Core::Query * query) const {
 
+    std::vector<std::shared_ptr<XcbWindowHandle>> allWins = XcbWindowHandle::getRootChildren();
+    for (std::shared_ptr<XcbWindowHandle>& win : allWins)
+        query->addMatch(win->produceItem(), UINT_MAX);
+
     // Queries can be empty
-    if ( query->searchTerm().isEmpty() )
+//    if ( query->searchTerm().isEmpty() )
         return;
 
     // If you registered a trigger and it matches trigger will contain it

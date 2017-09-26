@@ -18,19 +18,47 @@
 #include <xcb/xcb.h>
 #include <QtX11Extras/QX11Info>
 
+using ActionVector = std::vector<std::shared_ptr<Core::Action> >;
 
+namespace {
+
+using XcbWS::XcbWindowHandle;
+
+class WindowItem : public Core::Item {
+public:
+    WindowItem(XcbWindowHandle& win) : win_(win) {}
+    WindowItem(XcbWindowHandle* win) : win_(*win) {}
+    QString id() const override { return ""; }
+    QString iconPath() const override { return "go-top"; }
+    QString text() const override { return win_.name(); }
+    QString subtext() const override { return "Manipulate window"; }
+    std::vector<std::shared_ptr<Core::Action>> actions() override;
+private:
+    XcbWindowHandle& win_;
+};
+
+class RaiseAction : public Core::Action {
+public:
+    RaiseAction(XcbWindowHandle& win);
+    QString text() const override { return "Raise"; }
+    void activate() { win_.raise(); }
+private:
+    XcbWindowHandle& win_;
+};
+
+}
 
 /** ***************************************************************************/
-XcbWS::XcbWindowHandle::XcbWindowHandle(xcb_get_property_cookie_t cookie) {
+XcbWS::XcbWindowHandle::XcbWindowHandle(xcb_window_t w, xcb_get_property_cookie_t cookie) : window_(w) {
     // Get the property reply from the cookie
     xcb_get_property_reply_t* prop = xcb_get_property_reply(QX11Info::connection(), cookie, NULL);
 
     // And skip invalid ones
     if (!prop)
-        throw not_applicable_t;
+        throw not_applicable_t();
     int len = xcb_get_property_value_length(prop);
     if (len == 0)
-        throw not_applicable_t;
+        throw not_applicable_t();
 
     // Extract the name
     char* nameloc = (char*) xcb_get_property_value(prop);
@@ -60,17 +88,31 @@ QString XcbWS::XcbWindowHandle::name() const {
 
 /** ***************************************************************************/
 void XcbWS::XcbWindowHandle::raise() {
+    static const uint32_t values[] = {XCB_STACK_MODE_ABOVE};
+    xcb_void_cookie_t check = xcb_configure_window(QX11Info::connection(), window_, XCB_CONFIG_WINDOW_STACK_MODE, values);
 
+    xcb_generic_error_t* err;
+    if ((err = xcb_request_check(QX11Info::connection(), check))) {
+        qWarning("Raising window ended with error %d", err->error_code);
+        free(err);
+    }
 }
 
 
 
 /** ***************************************************************************/
-QList<std::unique_ptr<XcbWindowHandle>> XcbWS::XcbWindowHandle::getRootChildren() {
+std::shared_ptr<Core::Item> XcbWindowHandle::produceItem() {
+    return std::shared_ptr<Core::Item>(new WindowItem(this));
+}
+
+
+
+/** ***************************************************************************/
+std::vector<std::shared_ptr<XcbWS::XcbWindowHandle> > XcbWS::XcbWindowHandle::getRootChildren() {
     xcb_connection_t* xc = QX11Info::connection();
 
     /* Get the screen whose number is QX11Info::appScreen() */
-    const xcb_setup_t *setup = xcb_get_setup (connection);
+    const xcb_setup_t *setup = xcb_get_setup (xc);
     xcb_screen_iterator_t iter = xcb_setup_roots_iterator (setup);
 
     // we want the screen at index QX11Info::appScreen() of the iterator
@@ -97,13 +139,23 @@ QList<std::unique_ptr<XcbWindowHandle>> XcbWS::XcbWindowHandle::getRootChildren(
     }
 
 
-    QList<std::unique_ptr<XcbWindowHandle>> toReturn;
+    std::vector<std::shared_ptr<XcbWindowHandle>> toReturn;
     for (int i = 0; i < nChildren; i++) {
         try {
-            XcbWindowHandle* next = new XcbWindowHandle(requestCookies[i]);
-            toReturn.append(std::unique_ptr<XcbWindowHandle>(next));
+            XcbWindowHandle* next = new XcbWindowHandle(children[i], requestCookies[i]);
+            toReturn.emplace_back(next);
         } catch(not_applicable_t) {
             continue;
         }
     }
+    return toReturn;
+}
+
+
+
+/** ***************************************************************************/
+ActionVector WindowItem::actions() {
+    ActionVector ret;
+    ret.emplace_back(new RaiseAction(win_));
+    return ret;
 }
